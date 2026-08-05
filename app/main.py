@@ -45,9 +45,11 @@ def health() -> dict:
     return {
         "status": "ok",
         "zhipu_key_configured": bool(settings.zhipu_api_key),
+        "openai_key_configured": bool(settings.openai_api_key),
         "models": {
             "vlm": settings.vlm_model,
             "llm": settings.llm_model,
             "image_gen": settings.image_gen_model,
+            "portrait_cartoonize": settings.openai_image_model if settings.openai_api_key else settings.image_gen_model,
         },
     }

@@ -2,12 +2,21 @@
 
 照片转奶龙卡通系统 —— 后端（FastAPI）
 
+## 当前人物头像流程
+
+人物接口已调整为“只复刻头像”：`/avatars/analyze` 自动裁出脸、头发和耳饰，`/avatars/compose` 使用参考图生成透明二维动漫头像。完整身体由 Phaser 前端模板负责，避免自拍或半身照生成没有身体、比例不统一的游戏角色。
+
+- `POST /api/v1/avatars/analyze`：上传照片并裁剪头像
+- `POST /api/v1/avatars/compose`：生成透明动漫头像
+- `POST /api/v1/backgrounds/cartoonize`：根据文字生成卡通背景
+- `GET /api/health`：检查密钥和模型配置
+
 ## 快速开始
 
 ```bash
 conda activate ND        # 或新建：conda create -n ND python=3.10 -y
 pip install -r requirements.txt
-cp .env.example .env     # 填入智谱 API Key（不填也能跑，VLM/剧本相关自动降级）
+cp .env.example .env     # 填入自己的 API Key；真实密钥禁止提交
 uvicorn app.main:app --reload --port 8000
 ```
 

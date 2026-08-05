@@ -80,6 +80,17 @@ def _opencv_cartoonize(img: Image.Image) -> Image.Image:
     return Image.fromarray(cv2.cvtColor(cartoon, cv2.COLOR_BGR2RGB))
 
 
+def _opencv_anime_portrait(img: Image.Image) -> Image.Image:
+    """人像专用保真卡通化：减少粗黑边和肤色断层，保持五官与衣服细节。"""
+    bgr = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+    # OpenCV 风格化滤镜保留结构，同时得到柔和的手绘色块。
+    painted = cv2.stylization(bgr, sigma_s=70, sigma_r=0.32)
+    painted = cv2.bilateralFilter(painted, d=7, sigmaColor=45, sigmaSpace=45)
+    # 轻度量化而非强制八色，避免脸部出现大块脏色。
+    quant = (painted // 16) * 16 + 8
+    return Image.fromarray(cv2.cvtColor(quant, cv2.COLOR_BGR2RGB))
+
+
 def cartoonize(image_bytes: bytes, style: CartoonStyle,
                description: str | None = None) -> bytes:
     """照片 → 卡通背景（PNG bytes）。永不抛错。
@@ -113,3 +124,24 @@ def cartoonize(image_bytes: bytes, style: CartoonStyle,
 
 def cartoonize_to_file(image_bytes: bytes, style: CartoonStyle, path) -> None:
     path.write_bytes(cartoonize(image_bytes, style))
+
+
+def animegan_portrait(image_bytes: bytes) -> bytes | None:
+    """忠实人像风格迁移：优先 AnimeGAN，不可用时使用本地保真卡通滤镜。"""
+    try:
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        out = _animegan_cartoonize(img, CartoonStyle.face_paint_v2)
+    except Exception as e:
+        log.warning("AnimeGAN 人像卡通化不可用，使用本地保真卡通滤镜: %s", e)
+        try:
+            out = _opencv_anime_portrait(img)
+        except Exception as fallback_error:
+            log.warning("本地人像卡通化失败: %s", fallback_error)
+            return None
+    try:
+        buf = io.BytesIO()
+        out.save(buf, "PNG")
+        return buf.getvalue()
+    except Exception as e:
+        log.warning("人像卡通图编码失败: %s", e)
+        return None

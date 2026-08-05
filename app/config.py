@@ -15,7 +15,11 @@ os.environ.setdefault("U2NET_HOME", str(_CACHE / "u2net"))        # rembg 抠图
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=BASE_DIR / ".env", env_prefix="NAILONG_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(BASE_DIR / ".env", BASE_DIR.parent.parent / "zhipu-api-key.env"),
+        env_prefix="NAILONG_",
+        extra="ignore",
+    )
 
     # ---- 智谱开放平台（免费模型三件套）----
     zhipu_api_key: str = ""
@@ -24,6 +28,11 @@ class Settings(BaseSettings):
     llm_model: str = "glm-4-flash"         # 文本生成：剧本/游戏配置（免费）
     image_gen_model: str = "cogview-3-flash"  # 文生图：素材制作/精致版彩蛋（免费）
     cogvideo_model: str = "cogvideox-flash"  # 文生视频（免费，纯文本→mp4）
+
+    # ---- OpenAI 图片编辑（直接参考原照片卡通化）----
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_image_model: str = "gpt-image-1.5"
 
     # ---- 限流（按控制台"速率限制"页调整）----
     api_concurrency: int = 2               # 免费模型并发较低，别贪
@@ -34,6 +43,7 @@ class Settings(BaseSettings):
     assets_dir: Path = BASE_DIR / "app" / "assets"     # 奶龙图层素材库/精灵/字体
     animegan_weight: str = "animeganv2_hayao.pt"       # 放 assets/weights/ 下
     device: str = "cuda"                    # 无独显改 "cpu"（AnimeGAN 也能跑）
+    disable_mediapipe: bool = False           # Mac Metal 不兼容时使用默认五官特征
 
     # ---- 服务 ----
     cors_origins: list[str] = ["*"]         # 开发期放开，上线收紧

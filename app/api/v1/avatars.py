@@ -14,7 +14,7 @@ from ...schemas.avatar import (
 )
 from ...prompts import LABELS
 from ...schemas.common import ImageRef
-from ...services import avatar_compose, bg_remove, face, image_gen, store, vlm
+from ...services import avatar_compose, bg_remove, cartoon, face, image_gen, openai_image, store, vlm
 
 router = APIRouter()
 
@@ -44,10 +44,21 @@ async def analyze_avatar(file: UploadFile = File(...)) -> AvatarAnalyzeResponse:
         raise HTTPException(400, "空文件")
 
     # 1. MediaPipe 人脸关键点 + 量化信号（本地 CPU）
-    try:
-        face_bytes, signals = face.analyze_face(data)
-    except ImportError:
-        raise HTTPException(500, "mediapipe 未安装，请先 pip install mediapipe")
+    if settings.disable_mediapipe:
+        face_bytes = face.crop_face_opencv(data)
+        signals = MediapipeSignals(
+            face_detected=False, smile_score=0.5,
+            eye_open_ratio=1.0, face_width_height_ratio=0.8,
+        )
+    else:
+        try:
+            face_bytes, signals = face.analyze_face(data)
+        except (ImportError, FileNotFoundError):
+            face_bytes = data
+            signals = MediapipeSignals(
+                face_detected=False, smile_score=0.5,
+                eye_open_ratio=1.0, face_width_height_ratio=0.8,
+            )
 
     # 2. GLM-4V-Flash 语义特征（失败降级默认特征，不阻塞流程）
     try:
@@ -76,10 +87,21 @@ def compose_avatar(req: ComposeRequest) -> AvatarComposeResponse:
     avatar_id = req.avatar_id or store.new_id()
     png_path = _image_path(avatar_id)
 
-    # 主图：GLM-4 扩写 prompt → CogView 生成 → rembg 抠透明；任一步失败直接报错（无纸娃娃兜底）
-    cogview_bytes = image_gen.cogview_avatar(req.features)
-    cutout_bytes = (bg_remove.cutout_to_canvas(cogview_bytes, 512)
-                    if cogview_bytes else None)
+    # 首选：参考图高保真编辑。提示词明确禁止幼儿化/改身材/换服装。
+    face_path = store.output_dir("faces") / f"{avatar_id}.jpg"
+    source_bytes = face_path.read_bytes() if face_path.exists() else b""
+    edited_bytes = openai_image.cartoonize_portrait(source_bytes, face_path.name) if source_bytes else None
+
+    # 接口不可用时使用本地保真卡通化；最后才回退到纯文生图重画。
+    if not edited_bytes and source_bytes:
+        edited_bytes = cartoon.animegan_portrait(source_bytes)
+    cutout_bytes = bg_remove.cutout_to_canvas(edited_bytes, 512) if edited_bytes else None
+
+    # 自动降级：OpenAI 不可用时仍可走原 CogView 特征重绘流程。
+    if not cutout_bytes:
+        cogview_bytes = image_gen.cogview_avatar(req.features)
+        cutout_bytes = (bg_remove.cutout_to_canvas(cogview_bytes, 512)
+                        if cogview_bytes else None)
     if not cutout_bytes:
         raise HTTPException(502, "形象生成失败：CogView/抠图未返回有效结果（已无纸娃娃兜底）")
     png_path.write_bytes(cutout_bytes)

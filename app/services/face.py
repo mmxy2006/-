@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import io
 import logging
+from pathlib import Path
 
+import cv2
 import numpy as np
 from PIL import Image
 
@@ -32,6 +34,49 @@ _L_CHEEK, _R_CHEEK = 234, 454        # 左右脸颊（脸宽）
 _FOREHEAD, _CHIN = 10, 152           # 额头、下巴（脸长）
 
 _landmarker = None
+
+
+def crop_face_opencv(image_bytes: bytes) -> bytes:
+    """无需 MediaPipe 的安全人脸裁剪，供 Mac 环境和头像生成使用。"""
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    rgb = np.array(img)
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    cascade = cv2.CascadeClassifier(cascade_path) if Path(cascade_path).exists() else None
+    faces = [] if cascade is None or cascade.empty() else cascade.detectMultiScale(
+        gray, scaleFactor=1.1, minNeighbors=5,
+        minSize=(max(40, img.width // 12), max(40, img.height // 12)),
+    )
+    if len(faces):
+        x, y, w, h = max(faces, key=lambda item: item[2] * item[3])
+        # 头发、耳朵和少量颈部一起保留，避免只剩五官。
+        x0, y0 = max(0, x - int(w * .35)), max(0, y - int(h * .55))
+        x1, y1 = min(img.width, x + w + int(w * .35)), min(img.height, y + h + int(h * .30))
+        img = img.crop((x0, y0, x1, y1))
+    else:
+        # OpenCV 精简包可能不带分类器：根据抠图主体顶部估算头像区域。
+        try:
+            from rembg import remove
+            foreground = Image.open(io.BytesIO(remove(image_bytes))).convert("RGBA")
+            bbox = foreground.getbbox()
+        except Exception:
+            bbox = None
+        if bbox:
+            x0, y0, x1, y1 = bbox
+            person_w = x1 - x0
+            side = max(96, int(person_w * .68))
+            cx = (x0 + x1) // 2
+            img = img.crop((max(0, cx - side // 2), max(0, y0),
+                            min(img.width, cx + side // 2), min(img.height, y0 + side)))
+        else:
+            side = min(img.width, img.height)
+            cx = img.width // 2
+            top = max(0, int(img.height * .08))
+            img = img.crop((max(0, cx - side // 2), top,
+                            min(img.width, cx + side // 2), min(img.height, top + side)))
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=92)
+    return buf.getvalue()
 
 
 def _get_landmarker():
