@@ -1,69 +1,97 @@
-# 照片转奶龙卡通闯关小游戏系统
-## 项目简介
-本项目基于**多模态视觉大模型**与**AIGC图像生成技术**，开发网页端交互应用。用户上传实拍照片后，系统自动识别人物五官、画面背景风景，将图中人物转化为五官匹配的奶龙卡通形象，把原图背景卡通化重构，融合人物与卡通背景搭建专属虚拟动画空间，并基于该动画空间生成可交互情景闯关小游戏。用户可自主调整闯关难度、游戏特效、场景参数等设置，实现**照片个性化卡通化+互动游戏生成**一体化效果。
+# Anime Fighter Web
 
-核心亮点：结合**人像五官迁移卡通化**、**实景背景卡通重绘**、**自定义闯关游戏生成**三大功能，将静态照片转化为可操作互动小游戏，兼具趣味性与个性化，完整落地Prompt Engineering、多模态图像生成、简易游戏渲染全流程。
-## 一、运行环境配置
-### 1. 基础环境要求
-Python 3.10
-运行载体：网页端**Gradio交互Demo**，兼容Windows、Mac、Linux系统
-硬件：**CPU**可基础运行，有独立**NVIDIA GPU**可大幅加速图像生成
-### 2.1 创建并激活项目虚拟环境
-打开Anaconda终端执行指令：
-```bash
-conda create -n photo_moments python=3.10
-conda activate photo_moments
+基于 Phaser 3 + JavaScript + Vite 的 Web 端 AI 卡通横版格斗游戏。用户上传照片后，后端仅提取并动漫化头像；前端把透明头像挂载到完整格斗身体模板上，保证自拍、半身照和全身照都能生成完整角色。
+
+## 已实现功能
+
+- A/D 移动、W 跳跃、S 下蹲、Shift + 方向滑跳
+- J 普通攻击，Q/E/R 三个技能
+- 攻击框、受伤框、击退、无敌帧和血量条
+- PVE 自动移动与攻击 AI
+- 动态加载后端生成的头像和卡通场景
+- 头像与预制格斗身体组合，四肢随移动和跳跃摆动
+- 预留 WebSocket PVP 接口
+
+## 项目结构
+
+```text
+.
+├── index.html
+├── package.json
+├── .env.example
+└── src
+    ├── config/gameplay.js
+    ├── entities/Fighter.js
+    ├── scenes/
+    ├── services/AnimeGanService.js
+    ├── services/MultiplayerGateway.js
+    ├── systems/
+    └── ui/AssetGeneratorController.js
 ```
-### 2.2 批量安装全部依赖库
+
+## 启动
+
+要求 Node.js 18+：
+
 ```bash
-pip install -r requirements.txt
+npm install
+npm start
 ```
 
-### 2.3 启动网页程序
-```bash
-python app.py
+打开 `http://127.0.0.1:5173/`。
+
+修改后端地址时，把 `.env.example` 复制为 `.env.local`：
+
+```dotenv
+VITE_ANIMEGAN_API_URL=http://127.0.0.1:8000
 ```
 
-### 3. 库功能说明
-1. **gradio**：搭建网页交互前端，实现图片上传、参数调节
-2. **pillow**：图像处理、像素计算、结果可视化
-## 二、项目文件目录结构
-Nailong_Game_System/
-├── main.py                 # 网页交互总入口，Gradio 页面搭建
-├── face_analysis.py        # 人像五官识别、五官匹配奶龙卡通生成模块
-├── background_cartoon.py  # 实景背景卡通化重绘、虚拟动画空间构建
-├── game_generator.py       # 闯关游戏生成、难度调节、游戏参数配置模块
-├── image_utils.py          # 图片预处理、抠图、尺寸归一化工具函数
-├── prompt_lib.py           # 全套分层 Prompt 工程代码
-├── test_photo/            # 测试照片数据集（人像、风景、合照实拍图）
-└── README.md              # 项目部署、功能说明文档
-## 三、项目完整运行步骤
-1. 安装**Anaconda**，打开终端创建并激活虚拟环境 photo_moments
-2. 复制pip安装命令，等待所有依赖库安装完成
-3. 将项目全部文件放入同一文件夹，终端切换至**项目根目录**
-4. 执行启动命令：`python app.py`
-5. 运行成功后终端输出本地网页链接，浏览器打开即可使用全部功能
-## 四、系统核心功能介绍
-1. **照片批量上传与预处理**
-支持单张/多张人像照片上传，自动完成人像抠图、人物/背景分割、尺寸标准化处理。
+## 后端接口
 
-2. **人像五官匹配奶龙卡通生成**
-视觉模型提取人物五官特征，通过定制Prompt生成五官高度贴合原图人物的奶龙卡通形象，保留个人辨识度。
+后端代码位于同一仓库的 `backend`（兼容原 `feature/backend-dev`）分支，默认地址为 `http://127.0.0.1:8000`。
 
-3. **实景背景卡通化重构**
-识别原图风景、室内场景，将真实画面转化治愈卡通画风，搭建专属虚拟动画空间。
+人物头像流程：
 
-4. **一体化情景闯关游戏生成**
-融合奶龙卡通人物与卡通背景，自动生成对应场景的闯关小游戏，包含移动、躲避、收集等基础交互逻辑。
+1. `POST /api/v1/avatars/analyze`
+   - `multipart/form-data`，字段 `file`
+   - 自动裁出脸、头发和耳饰，返回 `avatar_id` 与 `features`
+2. `POST /api/v1/avatars/compose`
+   - JSON：`{ "avatar_id": "...", "features": { ... } }`
+   - 生成透明二维动漫头像，失败时自动使用本地保真卡通化
+3. 前端读取 `image.url`，把头像挂到 Phaser 格斗身体模板
 
-5. **自定义游戏参数调节面板**
-网页端可视化调节：闯关难度（简单/中等/困难）、怪物数量、道具数量、游戏时长、背景滤镜、奶龙形象样式等参数。
+背景接口：
 
-6. **素材导出功能**
-支持导出卡通人物图、卡通背景图、完整游戏截图、游戏本地运行包。
-## 五、核心Prompt工程设计
-项目分层设计四类提示词，是作业核心实现内容：
-1. **人像五官解析Prompt**：提取人物五官轮廓、脸型、神态特征，结构化输出特征数据
-2. **背景风格重绘Prompt**：控制实景照片转化柔和卡通画风，保留场景原有空间结构
-3. **奶龙人物融合Prompt**：绑定真人五官特征与奶龙IP卡通形象，保证人物辨识度不丢失
-4. **游戏场景生成Prompt**：匹配卡通人物与背景环境，生成完整闯关关卡规则与交互素材
+```http
+POST /api/v1/backgrounds/cartoonize
+Content-Type: application/json
+
+{"prompt":"夜晚霓虹都市屋顶"}
+```
+
+健康检查：`GET /api/health`。
+
+## 后端环境变量
+
+在后端分支将 `.env.example` 复制为 `.env`。不要提交真实密钥：
+
+```dotenv
+NAILONG_ZHIPU_API_KEY=
+NAILONG_OPENAI_API_KEY=
+NAILONG_OPENAI_BASE_URL=https://api.example.com/v1
+NAILONG_OPENAI_IMAGE_MODEL=gpt-image-2
+NAILONG_DEVICE=cpu
+NAILONG_DISABLE_MEDIAPIPE=true
+```
+
+## 直接指定素材
+
+```text
+?player=https://example.com/head.png&opponent=https://example.com/enemy.png&background=https://example.com/stage.jpg
+```
+
+接口封装位于 `src/services/AnimeGanService.js`，生成页面控制位于 `src/ui/AssetGeneratorController.js`。
+
+## 参考说明
+
+运动状态、跳跃速度、攻击框/受伤框、击退、血量和场景分层思路参考 `samurai-js/sf3js-old`（MIT）。本项目为重新设计的 Phaser 3 ES Module 实现，没有复制原仓库素材或完整项目。

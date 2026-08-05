@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Anime Fighter</title>
+  </head>
+  <body>
+    <main id="app">
+      <header class="brand"><span>ANIME</span> FIGHTER <small>AI CARTOON BATTLE</small></header>
+      <div id="game-container"></div>
+      <section class="generator" aria-label="AI 人物生成">
+        <label>人物照片<input id="character-file" type="file" accept="image/jpeg,image/png,image/webp,image/bmp" /></label>
+        <label>背景描述（可选）<input id="background-prompt" type="text" maxlength="500" placeholder="例如：夜晚霓虹都市屋顶" /></label>
+        <button id="generate-assets" type="button">生成动画形象并开始</button>
+        <span id="generation-status" role="status">请先启动后端服务</span>
+      </section>
+      <p class="controls">A/D 移动 · W 跳跃 · S 下蹲 · Shift + 方向 滑跳 · J 普攻 · Q/E/R 技能</p>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
