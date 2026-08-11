@@ -1,15 +1,21 @@
+import io
+import os
 import uuid
 from pathlib import Path
+from urllib.parse import urlencode
 
 import gradio as gr
-from PIL import Image, ImageEnhance
+import httpx
+from PIL import Image
 
 
 # =========================================================
 # 基础配置
 # =========================================================
 
-APP_NAME = "奶龙奇幻冒险之旅"
+APP_NAME = "萌萌趣味斗"
+BACKEND_URL = os.getenv("NAILONG_BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
+GAME_URL = os.getenv("NAILONG_GAME_URL", "http://127.0.0.1:5173").rstrip("/")
 
 BASE_DIR = Path(__file__).parent
 
@@ -45,59 +51,138 @@ for asset in REQUIRED_ASSETS:
 
 
 # =========================================================
-# 临时功能函数：后续替换为后端真实接口
+# 后端接口集成
 # =========================================================
 
-def generate_nailong_mock(image, style):
+STYLE_PROMPTS = {
+    "经典奶龙": "阳光草地与远山，经典治愈卡通风格，适合横版格斗游戏",
+    "可爱奶龙": "糖果色梦幻乐园，可爱萌系卡通风格，适合横版格斗游戏",
+    "校园奶龙": "明亮校园操场、教学楼和跑道，青春卡通风格",
+    "旅行奶龙": "蓝天、山野和旅行营地，清新卡通冒险风格",
+    "奇幻奶龙": "魔法森林、发光植物和远处城堡，奇幻卡通风格",
+}
+
+
+def _absolute_backend_url(path):
+    if not path:
+        return None
+    if path.startswith(("http://", "https://")):
+        return path
+    return f"{BACKEND_URL}/{path.lstrip('/')}"
+
+
+def _save_remote_image(client, url, folder, prefix):
+    response = client.get(url)
+    response.raise_for_status()
+    suffix = ".png" if "png" in response.headers.get("content-type", "") else ".jpg"
+    path = folder / f"{prefix}_{uuid.uuid4().hex[:10]}{suffix}"
+    path.write_bytes(response.content)
+    return str(path.resolve())
+
+
+def generate_nailong(image, background_image):
     if image is None:
         raise gr.Error("请先上传一张清晰的人物照片。")
+    if background_image is None:
+        raise gr.Error("请上传一张需要卡通化的场景照片。")
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="JPEG", quality=94)
+    photo = buffer.getvalue()
+    background_buffer = io.BytesIO()
+    background_image.convert("RGB").save(background_buffer, format="JPEG", quality=94)
+    background_photo = background_buffer.getvalue()
 
-    task_id = str(uuid.uuid4())[:8]
-    avatar_path = AVATAR_DIR / f"avatar_{task_id}.png"
-    background_path = BACKGROUND_DIR / f"background_{task_id}.png"
+    try:
+        with httpx.Client(timeout=300.0) as client:
+            health = client.get(f"{BACKEND_URL}/api/health")
+            health.raise_for_status()
+            analyzed_response = client.post(
+                f"{BACKEND_URL}/api/v1/avatars/analyze",
+                files={"file": ("portrait.jpg", photo, "image/jpeg")},
+            )
+            analyzed_response.raise_for_status()
+            analyzed = analyzed_response.json()
 
-    avatar = image.convert("RGB")
-    avatar.thumbnail((720, 720))
+            composed_response = client.post(
+                f"{BACKEND_URL}/api/v1/avatars/compose",
+                json={
+                    "avatar_id": analyzed["avatar_id"],
+                    "features": analyzed["features"],
+                },
+            )
+            composed_response.raise_for_status()
+            composed = composed_response.json()
 
-    canvas = Image.new("RGB", (720, 720), color=(255, 242, 193))
-    x = (720 - avatar.width) // 2
-    y = (720 - avatar.height) // 2
-    canvas.paste(avatar, (x, y))
-    canvas = ImageEnhance.Color(canvas).enhance(1.35)
-    canvas.save(str(avatar_path), format="PNG")
+            background_response = client.post(
+                f"{BACKEND_URL}/api/v1/backgrounds/cartoonize-photo",
+                files={"file": ("scene.jpg", background_photo, "image/jpeg")},
+            )
+            background_response.raise_for_status()
+            background = background_response.json()
 
-    background = image.convert("RGB")
-    background = background.resize((1100, 650))
-    background = ImageEnhance.Color(background).enhance(1.45)
-    background.save(str(background_path), format="PNG")
+            avatar_url = _absolute_backend_url(composed["image"]["url"])
+            background_url = _absolute_backend_url(background["image"]["url"])
+            avatar_path = _save_remote_image(client, avatar_url, AVATAR_DIR, "avatar")
+            background_path = _save_remote_image(client, background_url, BACKGROUND_DIR, "background")
+    except httpx.HTTPStatusError as exc:
+        detail = ""
+        try:
+            detail = exc.response.json().get("detail", "")
+        except Exception:
+            pass
+        raise gr.Error(f"后端生成失败：{detail or exc.response.status_code}") from exc
+    except Exception as exc:
+        raise gr.Error(f"无法连接生成服务：{exc}") from exc
 
     status = f"""
 <div class="success-box">
     <div class="success-title">✨ 形象生成完成</div>
-    <div>当前风格：{style}</div>
+    <div>人物形象和上传场景均已完成卡通化。</div>
     <div class="success-note">
-        当前为前端模拟结果。接入后端后，
-        这里将显示真正生成的奶龙卡通形象。
+        已通过后端完成头像分析、透明动漫头像生成和卡通场景生成，
+        可以进入冒险游戏使用当前角色。
     </div>
 </div>
 """
 
     return (
-        str(avatar_path.resolve()),
-        str(background_path.resolve()),
-        str(avatar_path.resolve()),
-        str(background_path.resolve()),
+        avatar_path,
+        background_path,
+        {"local_path": avatar_path, "url": avatar_url, "avatar_id": analyzed["avatar_id"]},
+        {"local_path": background_path, "url": background_url, "background_id": background["background_id"]},
         status,
     )
 
 
-def refresh_ranking_mock(ranking_type):
-    return [
-        [1, "奶龙勇士", 9800, "森林冒险", "58秒"],
-        [2, "小星星", 9250, "校园历险", "63秒"],
-        [3, "云朵玩家", 8760, "奇幻城堡", "71秒"],
-        [4, "橙子奶龙", 8210, "云端世界", "75秒"],
-    ]
+def refresh_ranking(ranking_type):
+    try:
+        response = httpx.get(
+            f"{BACKEND_URL}/api/v1/games/leaderboard",
+            params={"difficulty": "normal", "limit": 20},
+            timeout=20.0,
+        )
+        response.raise_for_status()
+        entries = response.json().get("entries", [])
+        if not entries:
+            return [["-", "暂无成绩", 0, "普通", "-"]]
+        return [
+            [item["rank"], item["nickname"], item["score"], item["difficulty"], item["created_at"][:19]]
+            for item in entries
+        ]
+    except Exception:
+        return [["-", "排行榜服务暂不可用", 0, "-", "-"]]
+
+
+def start_game(avatar, background):
+    if not avatar or not background:
+        raise gr.Error("请先在形象生成页面生成角色和背景。")
+    params = urlencode({"player": avatar["url"], "background": background["url"]})
+    src = f"{GAME_URL}/?{params}"
+    return f"""
+<div class="game-frame-wrap">
+  <iframe src="{src}" title="AI 卡通格斗游戏" allow="autoplay; fullscreen" loading="eager"></iframe>
+</div>
+"""
 
 
 def switch_page(page_index):
@@ -105,6 +190,26 @@ def switch_page(page_index):
         gr.update(visible=(index == page_index))
         for index in range(4)
     )
+
+
+def navigation_js(page_index):
+    """页面导航在浏览器端立即完成，避免本地代理影响 Gradio 事件队列。"""
+    return f"""
+() => {{
+    const pages = ['home-page', 'avatar-page', 'game-page', 'ranking-page'];
+    const navs = ['home-nav', 'avatar-nav', 'game-nav', 'ranking-nav'];
+    pages.forEach((id, index) => {{
+        const page = document.getElementById(id);
+        if (page) page.style.display = index === {page_index} ? 'flex' : 'none';
+    }});
+    navs.forEach((id, index) => {{
+        const nav = document.getElementById(id);
+        if (nav) nav.classList.toggle('nav-current', index === {page_index});
+    }});
+    window.scrollTo({{ top: 0, behavior: 'smooth' }});
+    return [];
+}}
+"""
 
 
 # =========================================================
@@ -559,6 +664,23 @@ body {
     font-weight: 900;
 }
 
+.game-frame-wrap {
+    width: 100%;
+    overflow: hidden;
+    border: 3px solid #e7a13f;
+    border-radius: 20px;
+    background: #14182f;
+    box-shadow: 0 14px 30px rgba(91, 56, 20, 0.18);
+}
+
+.game-frame-wrap iframe {
+    display: block;
+    width: 100%;
+    height: 640px;
+    border: 0;
+    background: #14182f;
+}
+
 .animation-settings {
     min-width: 0 !important;
     flex: 1 1 25% !important;
@@ -870,18 +992,22 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
             home_nav = gr.Button(
                 "🏠　首页",
                 elem_classes=["nav-button", "home-nav"],
+                elem_id="home-nav",
             )
             avatar_nav = gr.Button(
                 "👤　形象生成",
                 elem_classes="nav-button",
+                elem_id="avatar-nav",
             )
             game_nav = gr.Button(
                 "🎮　冒险游戏",
                 elem_classes="nav-button",
+                elem_id="game-nav",
             )
             ranking_nav = gr.Button(
                 "🏆　排行榜",
                 elem_classes="nav-button",
+                elem_id="ranking-nav",
             )
 
         with gr.Column(elem_classes="content-column"):
@@ -889,11 +1015,12 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
             with gr.Column(
                 visible=True,
                 elem_classes="page-shell",
+                elem_id="home-page",
             ) as home_page:
                 gr.HTML("""
 <div class="hero-banner">
     <div class="hero-text">
-        <div class="hero-title">奶龙奇幻冒险之旅</div>
+        <div class="hero-title">萌萌趣味斗</div>
         <div class="hero-tag">AI 个性化奶龙创作平台</div>
         <div class="hero-description">
             上传照片，生成你的专属奶龙形象，
@@ -936,11 +1063,12 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
             with gr.Column(
                 visible=False,
                 elem_classes="page-shell",
+                elem_id="avatar-page",
             ) as avatar_page:
                 gr.HTML("""
-<div class="page-title">👤 奶龙形象生成</div>
+<div class="page-title">👤 卡通形象生成</div>
 <div class="page-description">
-    上传清晰人物照片，选择奶龙风格。
+    上传清晰人物照片和场景照片，分别生成卡通角色与卡通场景。
 </div>
 """)
 
@@ -962,16 +1090,12 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                             height=350,
                             show_label=True,
                         )
-                        character_style = gr.Radio(
-                            choices=[
-                                "经典奶龙",
-                                "可爱奶龙",
-                                "校园奶龙",
-                                "旅行奶龙",
-                                "奇幻奶龙",
-                            ],
-                            value="经典奶龙",
-                            label="选择生成风格",
+                        background_image = gr.Image(
+                            label="上传场景照片并卡通化",
+                            type="pil",
+                            sources=["upload"],
+                            height=250,
+                            show_label=True,
                         )
                         generate_button = gr.Button(
                             "✨ 生成奶龙形象",
@@ -1010,8 +1134,8 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                             )
 
                 generate_event = generate_button.click(
-                    fn=generate_nailong_mock,
-                    inputs=[input_image, character_style],
+                    fn=generate_nailong,
+                    inputs=[input_image, background_image],
                     outputs=[
                         avatar_output,
                         background_output,
@@ -1021,7 +1145,7 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                     ],
                 )
                 generate_event.then(
-                    fn=lambda path: path,
+                    fn=lambda data: data.get("local_path") if data else None,
                     inputs=avatar_state,
                     outputs=download_avatar_button,
                 )
@@ -1030,6 +1154,7 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
             with gr.Column(
                 visible=False,
                 elem_classes="page-shell",
+                elem_id="game-page",
             ) as game_page:
                 gr.HTML("""
 <div class="page-title">🎮 奶龙冒险游戏</div>
@@ -1049,7 +1174,7 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
 """)
 
                 with gr.Column(elem_classes="content-card"):
-                    gr.HTML("""
+                    game_frame = gr.HTML("""
 <div class="game-display">
     <div class="game-hud">
         <span>❤️ 3</span>
@@ -1065,11 +1190,17 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                         variant="primary",
                         elem_classes="main-action",
                     )
+                    start_game_button.click(
+                        fn=start_game,
+                        inputs=[avatar_state, background_state],
+                        outputs=game_frame,
+                    )
 
             # 排行榜
             with gr.Column(
                 visible=False,
                 elem_classes="page-shell",
+                elem_id="ranking-page",
             ) as ranking_page:
                 gr.HTML("""
 <div class="page-title">🏆 奶龙冒险排行榜</div>
@@ -1109,12 +1240,12 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                             "str",
                             "str",
                         ],
-                        value=refresh_ranking_mock("总排行榜"),
+                        value=refresh_ranking("总排行榜"),
                         interactive=False,
                     )
 
                 refresh_ranking_button.click(
-                    fn=refresh_ranking_mock,
+                    fn=refresh_ranking,
                     inputs=ranking_type,
                     outputs=ranking_table,
                 )
@@ -1135,10 +1266,7 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
         (enter_game_button, 2),
         (enter_ranking_button, 3),
     ]:
-        button.click(
-            fn=lambda i=index: switch_page(i),
-            outputs=page_outputs,
-        )
+        button.click(fn=None, js=navigation_js(index), queue=False)
 
 
 if __name__ == "__main__":
