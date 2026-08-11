@@ -11,8 +11,10 @@ from PIL import Image, ImageEnhance
 
 APP_NAME = "奶龙奇幻冒险之旅"
 
-ASSETS_DIR = Path("assets")
-OUTPUT_DIR = Path("outputs")
+BASE_DIR = Path(__file__).parent
+
+ASSETS_DIR = BASE_DIR / "assets"
+OUTPUT_DIR = BASE_DIR / "outputs"
 AVATAR_DIR = OUTPUT_DIR / "avatars"
 BACKGROUND_DIR = OUTPUT_DIR / "backgrounds"
 VIDEO_DIR = OUTPUT_DIR / "videos"
@@ -24,6 +26,22 @@ for folder in [ASSETS_DIR, AVATAR_DIR, BACKGROUND_DIR, VIDEO_DIR]:
             "请删除或重命名该文件后重新运行。"
         )
     folder.mkdir(parents=True, exist_ok=True)
+
+
+# =========================================================
+# 检查前端资源
+# =========================================================
+REQUIRED_ASSETS = [
+    "logo.png",
+    "hero_banner.png",
+    "sidebar_character.png",
+    "default_avatar.png",
+]
+
+for asset in REQUIRED_ASSETS:
+    asset_path = ASSETS_DIR / asset
+    if not asset_path.exists():
+        print(f"⚠️ 缺少资源: {asset_path}")
 
 
 # =========================================================
@@ -46,12 +64,12 @@ def generate_nailong_mock(image, style):
     y = (720 - avatar.height) // 2
     canvas.paste(avatar, (x, y))
     canvas = ImageEnhance.Color(canvas).enhance(1.35)
-    canvas.save(avatar_path)
+    canvas.save(str(avatar_path), format="PNG")
 
     background = image.convert("RGB")
     background = background.resize((1100, 650))
     background = ImageEnhance.Color(background).enhance(1.45)
-    background.save(background_path)
+    background.save(str(background_path), format="PNG")
 
     status = f"""
 <div class="success-box">
@@ -65,67 +83,12 @@ def generate_nailong_mock(image, style):
 """
 
     return (
-        str(avatar_path),
-        str(background_path),
-        str(avatar_path),
-        str(background_path),
+        str(avatar_path.resolve()),
+        str(background_path.resolve()),
+        str(avatar_path.resolve()),
+        str(background_path.resolve()),
         status,
     )
-
-
-def load_avatar_mock(avatar_path):
-    if not avatar_path:
-        raise gr.Error("请先在形象生成页面创建奶龙。")
-    return avatar_path
-
-
-def customize_avatar_mock(
-    avatar_path,
-    hairstyle,
-    clothes,
-    accessory,
-    expression,
-):
-    if not avatar_path:
-        raise gr.Error("请先生成奶龙形象。")
-
-    gr.Info(
-        f"已选择：{hairstyle}、{clothes}、"
-        f"{accessory}、{expression}"
-    )
-    return avatar_path, avatar_path
-
-
-def generate_animation_mock(
-    avatar_path,
-    theme,
-    animation_style,
-    duration,
-):
-    if not avatar_path:
-        raise gr.Error("请先生成奶龙形象。")
-
-    description = f"""
-### 🎬 动画任务已经创建
-
-- 故事主题：**{theme}**
-- 动画风格：**{animation_style}**
-- 预计时长：**{duration} 秒**
-- 使用角色：当前奶龙角色
-
-后端将根据主题生成故事脚本、动画场景、字幕和配音。
-"""
-
-    return None, description
-
-
-def refresh_community_mock(category, order):
-    table = [
-        ["NL001", "校园奶龙的一天", "小星星", "动画故事", 128],
-        ["NL002", "森林金币大冒险", "云朵玩家", "冒险游戏", 96],
-        ["NL003", "宇航员奶龙", "奶龙勇士", "奶龙形象", 85],
-    ]
-    return [], table
 
 
 def refresh_ranking_mock(ranking_type):
@@ -137,46 +100,10 @@ def refresh_ranking_mock(ranking_type):
     ]
 
 
-def load_profile_mock():
-    profile_html = """
-<div class="profile-wide">
-    <div class="profile-left">
-        <div class="profile-avatar">🐲</div>
-        <div>
-            <div class="profile-name">奶龙创作者</div>
-            <div class="profile-subtitle">
-                正在等待后端读取用户资料
-            </div>
-        </div>
-    </div>
-
-    <div class="profile-stat-group">
-        <div class="profile-stat">
-            <b>6</b>
-            <span>我的作品</span>
-        </div>
-        <div class="profile-stat">
-            <b>328</b>
-            <span>获得点赞</span>
-        </div>
-        <div class="profile-stat">
-            <b>18</b>
-            <span>收藏作品</span>
-        </div>
-        <div class="profile-stat">
-            <b>9800</b>
-            <span>最高分数</span>
-        </div>
-    </div>
-</div>
-"""
-    return profile_html, []
-
-
 def switch_page(page_index):
     return tuple(
         gr.update(visible=(index == page_index))
-        for index in range(8)
+        for index in range(4)
     )
 
 
@@ -255,13 +182,21 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 66px;
-    height: 66px;
+    width: 76px;
+    height: 76px;
     margin: 0 auto 8px;
-    border-radius: 20px;
+    border-radius: 22px;
+    overflow: hidden;
     background: linear-gradient(145deg, #ffd85b, #ff9831);
-    font-size: 36px;
     box-shadow: 0 9px 20px rgba(224, 124, 29, 0.24);
+}
+
+
+.logo-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
 }
 
 .logo-title {
@@ -809,6 +744,33 @@ body {
     min-height: 285px !important;
 }
 
+
+/* 修复Gradio图片显示 */
+.gr-image,
+.gr-image-container,
+.image-container {
+    overflow: visible !important;
+}
+
+.gr-image img {
+    object-fit: contain !important;
+}
+
+.image-box {
+    overflow: visible !important;
+}
+
+/* Fix image component */
+.gr-image,
+.gr-image-container,
+.image-container {
+    overflow: visible !important;
+}
+
+.gr-image img {
+    object-fit: contain !important;
+}
+
 footer {
     display: none !important;
 }
@@ -895,9 +857,11 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
 
     with gr.Row(elem_classes="main-layout"):
         with gr.Column(elem_classes="sidebar"):
-            gr.HTML("""
+            gr.HTML(f"""
 <div class="logo-box">
-    <div class="logo-icon">🐲</div>
+    <div class="logo-icon">
+        <img src="/gradio_api/file={ASSETS_DIR / 'default_avatar.png'}">
+    </div>
     <div class="logo-title">奶龙冒险</div>
     <div class="logo-subtitle">Nailong Adventure</div>
 </div>
@@ -911,28 +875,12 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                 "👤　形象生成",
                 elem_classes="nav-button",
             )
-            dress_nav = gr.Button(
-                "👕　换装工坊",
-                elem_classes="nav-button",
-            )
             game_nav = gr.Button(
                 "🎮　冒险游戏",
                 elem_classes="nav-button",
             )
-            animation_nav = gr.Button(
-                "🎬　动画工坊",
-                elem_classes="nav-button",
-            )
-            community_nav = gr.Button(
-                "👥　创作社区",
-                elem_classes="nav-button",
-            )
             ranking_nav = gr.Button(
                 "🏆　排行榜",
-                elem_classes="nav-button",
-            )
-            profile_nav = gr.Button(
-                "👤　个人中心",
                 elem_classes="nav-button",
             )
 
@@ -958,9 +906,8 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                 with gr.Row(elem_classes="home-intro"):
                     for icon, title, text in [
                         ("🎨", "个性形象", "根据人物照片生成奶龙形象"),
-                        ("👗", "趣味换装", "自由选择发型、服装和配饰"),
                         ("🎮", "冒险游戏", "使用专属角色进入卡通关卡"),
-                        ("🎬", "动画故事", "根据主题生成专属动画"),
+                        ("🏆", "排行榜", "查看游戏成绩排行"),
                     ]:
                         gr.HTML(f"""
 <div class="home-card">
@@ -978,6 +925,10 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                     )
                     enter_game_button = gr.Button(
                         "🎮 进入冒险世界",
+                        elem_classes="secondary-action",
+                    )
+                    enter_ranking_button = gr.Button(
+                        "🏆 查看排行榜",
                         elem_classes="secondary-action",
                     )
 
@@ -1005,11 +956,11 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
 </div>
 """)
                         input_image = gr.Image(
-                            label="上传或拍摄照片",
+                            label="上传人物照片",
                             type="pil",
-                            sources=["upload", "webcam"],
-                            height=410,
-                            elem_classes="image-box",
+                            sources=["upload"],
+                            height=350,
+                            show_label=True,
                         )
                         character_style = gr.Radio(
                             choices=[
@@ -1043,22 +994,18 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                         avatar_output = gr.Image(
                             label="奶龙角色",
                             type="filepath",
-                            height=410,
-                            elem_classes="image-box",
+                            height=350,
+                            show_label=True,
                         )
                         background_output = gr.Image(
                             label="卡通背景",
                             type="filepath",
-                            height=230,
-                            elem_classes="image-box",
+                            height=180,
+                            show_label=True,
                         )
                         with gr.Row():
                             download_avatar_button = gr.DownloadButton(
                                 "⬇ 下载形象",
-                                elem_classes="secondary-action",
-                            )
-                            go_dress_button = gr.Button(
-                                "👕 去换装",
                                 elem_classes="secondary-action",
                             )
 
@@ -1077,142 +1024,6 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                     fn=lambda path: path,
                     inputs=avatar_state,
                     outputs=download_avatar_button,
-                )
-
-            # 换装工坊
-            with gr.Column(
-                visible=False,
-                elem_classes="page-shell",
-            ) as dress_page:
-                gr.HTML("""
-<div class="page-title">👕 奶龙换装工坊</div>
-<div class="page-description">
-    读取已生成的奶龙形象，为角色更换发型、服装、配饰和表情。
-</div>
-""")
-
-                with gr.Row(
-                    equal_height=True,
-                    elem_classes="dress-row",
-                ):
-                    with gr.Column(
-                        scale=1,
-                        elem_classes=["content-card", "dress-column"],
-                    ):
-                        gr.HTML("""
-<div class="section-title">🐲 当前奶龙角色</div>
-<div class="section-tip">
-    点击下方按钮读取形象生成页面中的角色。
-</div>
-""")
-                        current_avatar = gr.Image(
-                            label="当前角色",
-                            type="filepath",
-                            height=500,
-                            elem_classes="image-box",
-                        )
-                        load_avatar_button = gr.Button(
-                            "读取我的奶龙角色",
-                            elem_classes="secondary-action",
-                        )
-
-                    with gr.Column(
-                        scale=1,
-                        elem_classes=["content-card", "dress-column"],
-                    ):
-                        gr.HTML("""
-<div class="section-title">🎨 换装设置</div>
-<div class="section-tip">
-    选择不同的发型、服装、配饰和表情。
-</div>
-""")
-                        hairstyle = gr.Dropdown(
-                            choices=[
-                                "默认发型",
-                                "清爽短发",
-                                "柔顺长发",
-                                "元气双马尾",
-                                "俏皮卷发",
-                            ],
-                            value="默认发型",
-                            label="发型",
-                        )
-                        clothes = gr.Dropdown(
-                            choices=[
-                                "休闲服",
-                                "校园制服",
-                                "国风汉服",
-                                "宇航服",
-                                "运动服",
-                                "魔法师套装",
-                            ],
-                            value="休闲服",
-                            label="服装",
-                        )
-                        accessory = gr.Dropdown(
-                            choices=[
-                                "无",
-                                "圆框眼镜",
-                                "耳机",
-                                "旅行背包",
-                                "皇冠",
-                                "魔法棒",
-                            ],
-                            value="无",
-                            label="配饰",
-                        )
-                        expression = gr.Radio(
-                            choices=[
-                                "开心",
-                                "害羞",
-                                "惊讶",
-                                "勇敢",
-                            ],
-                            value="开心",
-                            label="表情",
-                        )
-                        apply_outfit_button = gr.Button(
-                            "🪄 应用换装",
-                            variant="primary",
-                            elem_classes="main-action",
-                        )
-
-                    with gr.Column(
-                        scale=1,
-                        elem_classes=["content-card", "dress-column"],
-                    ):
-                        gr.HTML("""
-<div class="section-title">✨ 换装效果</div>
-<div class="section-tip">
-    后端完成处理后，新角色将在这里显示。
-</div>
-""")
-                        outfit_result = gr.Image(
-                            label="换装结果",
-                            type="filepath",
-                            height=500,
-                            elem_classes="image-box",
-                        )
-                        save_outfit_button = gr.Button(
-                            "保存当前形象",
-                            elem_classes="secondary-action",
-                        )
-
-                load_avatar_button.click(
-                    fn=load_avatar_mock,
-                    inputs=avatar_state,
-                    outputs=current_avatar,
-                )
-                apply_outfit_button.click(
-                    fn=customize_avatar_mock,
-                    inputs=[
-                        avatar_state,
-                        hairstyle,
-                        clothes,
-                        accessory,
-                        expression,
-                    ],
-                    outputs=[outfit_result, avatar_state],
                 )
 
             # 冒险游戏
@@ -1254,167 +1065,6 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                         variant="primary",
                         elem_classes="main-action",
                     )
-
-            # 动画工坊
-            with gr.Column(
-                visible=False,
-                elem_classes="page-shell",
-            ) as animation_page:
-                gr.HTML("""
-<div class="page-title">🎬 奶龙动画工坊</div>
-<div class="page-description">
-    动画角色和素材由后端读取，用户选择故事主题和动画风格。
-</div>
-""")
-
-                with gr.Row(
-                    equal_height=True,
-                    elem_classes="animation-row",
-                ):
-                    with gr.Column(
-                        scale=1,
-                        elem_classes=["content-card", "animation-settings"],
-                    ):
-                        gr.HTML("""
-<div class="section-title">故事设置</div>
-<div class="section-tip">
-    选择故事主题、动画风格和视频时长。
-</div>
-""")
-                        story_theme = gr.Dropdown(
-                            choices=[
-                                "校园日记",
-                                "旅行历险",
-                                "友情故事",
-                                "成长故事",
-                                "森林冒险",
-                                "奇幻城堡",
-                                "星际探险",
-                                "搞笑日常",
-                            ],
-                            value="校园日记",
-                            label="选择故事主题",
-                        )
-                        animation_style = gr.Radio(
-                            choices=[
-                                "温馨治愈",
-                                "轻松搞笑",
-                                "热血冒险",
-                                "梦幻童话",
-                            ],
-                            value="温馨治愈",
-                            label="动画风格",
-                        )
-                        animation_duration = gr.Radio(
-                            choices=[15, 30, 60],
-                            value=30,
-                            label="动画时长（秒）",
-                        )
-                        generate_animation_button = gr.Button(
-                            "🎥 生成奶龙动画",
-                            variant="primary",
-                            elem_classes="main-action",
-                        )
-                        animation_status = gr.Markdown(
-                            "等待创建动画任务。"
-                        )
-
-                    with gr.Column(
-                        scale=3,
-                        elem_classes=["content-card", "animation-result-card"],
-                    ):
-                        gr.HTML("""
-<div class="section-title">🎞 后端生成的动画结果</div>
-""")
-                        animation_result = gr.Video(
-                            label=None,
-                            show_label=False,
-                            elem_classes="large-video",
-                        )
-
-                generate_animation_button.click(
-                    fn=generate_animation_mock,
-                    inputs=[
-                        avatar_state,
-                        story_theme,
-                        animation_style,
-                        animation_duration,
-                    ],
-                    outputs=[
-                        animation_result,
-                        animation_status,
-                    ],
-                )
-
-            # 创作社区
-            with gr.Column(
-                visible=False,
-                elem_classes="page-shell",
-            ) as community_page:
-                gr.HTML("""
-<div class="page-title">👥 奶龙创作社区</div>
-<div class="page-description">
-    浏览、点赞、评论和试玩其他用户的作品。
-</div>
-""")
-
-                with gr.Column(elem_classes="content-card"):
-                    with gr.Row():
-                        community_category = gr.Dropdown(
-                            choices=[
-                                "全部作品",
-                                "奶龙形象",
-                                "冒险游戏",
-                                "动画故事",
-                            ],
-                            value="全部作品",
-                            label="作品分类",
-                        )
-                        community_order = gr.Radio(
-                            choices=["热门", "最新"],
-                            value="热门",
-                            label="排序方式",
-                        )
-                        refresh_community_button = gr.Button(
-                            "刷新社区",
-                            elem_classes="secondary-action",
-                        )
-
-                    community_gallery = gr.Gallery(
-                        label="社区作品",
-                        columns=3,
-                        rows=2,
-                        object_fit="cover",
-                    )
-                    community_table = gr.Dataframe(
-                        headers=[
-                            "作品ID",
-                            "作品名称",
-                            "作者",
-                            "类型",
-                            "点赞数",
-                        ],
-                        datatype=[
-                            "str",
-                            "str",
-                            "str",
-                            "str",
-                            "number",
-                        ],
-                        interactive=False,
-                    )
-
-                refresh_community_button.click(
-                    fn=refresh_community_mock,
-                    inputs=[
-                        community_category,
-                        community_order,
-                    ],
-                    outputs=[
-                        community_gallery,
-                        community_table,
-                    ],
-                )
 
             # 排行榜
             with gr.Column(
@@ -1469,109 +1119,21 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                     outputs=ranking_table,
                 )
 
-            # 个人中心
-            with gr.Column(
-                visible=False,
-                elem_classes="page-shell",
-            ) as profile_page:
-                gr.HTML("""
-<div class="page-title">👤 个人中心</div>
-<div class="page-description">
-    个人资料、历史作品、点赞和收藏记录由后端读取。
-</div>
-""")
-
-                with gr.Column(
-                    elem_classes=["content-card", "profile-wide-card"],
-                ):
-                    profile_info = gr.HTML("""
-<div class="profile-wide">
-    <div class="profile-left">
-        <div class="profile-avatar">🐲</div>
-        <div>
-            <div class="profile-name">奶龙创作者</div>
-            <div class="profile-subtitle">
-                正在等待后端读取用户资料
-            </div>
-        </div>
-    </div>
-
-    <div class="profile-stat-group">
-        <div class="profile-stat"><b>0</b><span>我的作品</span></div>
-        <div class="profile-stat"><b>0</b><span>获得点赞</span></div>
-        <div class="profile-stat"><b>0</b><span>收藏作品</span></div>
-        <div class="profile-stat"><b>0</b><span>游戏成绩</span></div>
-    </div>
-</div>
-""")
-                    refresh_profile_button = gr.Button(
-                        "刷新个人资料",
-                        elem_classes="secondary-action",
-                    )
-
-                with gr.Column(
-                    elem_classes=["content-card", "my-works-wide-card"],
-                ):
-                    gr.HTML("""
-<div class="section-title">🖼 我的作品</div>
-""")
-                    with gr.Row():
-                        profile_work_type = gr.Dropdown(
-                            choices=[
-                                "全部作品",
-                                "奶龙形象",
-                                "冒险游戏",
-                                "动画作品",
-                            ],
-                            value="全部作品",
-                            label="作品类型",
-                        )
-                        profile_work_order = gr.Radio(
-                            choices=["最新", "最受欢迎"],
-                            value="最新",
-                            label="排序方式",
-                        )
-
-                    my_works_gallery = gr.Gallery(
-                        label=None,
-                        show_label=False,
-                        columns=4,
-                        rows=2,
-                        object_fit="cover",
-                        elem_classes="profile-gallery",
-                    )
-
-                refresh_profile_button.click(
-                    fn=load_profile_mock,
-                    outputs=[
-                        profile_info,
-                        my_works_gallery,
-                    ],
-                )
-
     page_outputs = [
         home_page,
         avatar_page,
-        dress_page,
         game_page,
-        animation_page,
-        community_page,
         ranking_page,
-        profile_page,
     ]
 
     for button, index in [
         (home_nav, 0),
         (avatar_nav, 1),
-        (dress_nav, 2),
-        (game_nav, 3),
-        (animation_nav, 4),
-        (community_nav, 5),
-        (ranking_nav, 6),
-        (profile_nav, 7),
+        (game_nav, 2),
+        (ranking_nav, 3),
         (enter_avatar_button, 1),
-        (enter_game_button, 3),
-        (go_dress_button, 2),
+        (enter_game_button, 2),
+        (enter_ranking_button, 3),
     ]:
         button.click(
             fn=lambda i=index: switch_page(i),
