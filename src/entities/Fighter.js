@@ -21,12 +21,13 @@ export class Fighter extends Phaser.GameObjects.Container {
     this.body.setSize(FIGHTER.bodyWidth, FIGHTER.bodyHeight).setOffset(-FIGHTER.bodyWidth / 2, -FIGHTER.bodyHeight);
     this.body.setCollideWorldBounds(true).setMaxVelocity(600, 900);
 
-    const shadow = scene.add.ellipse(0, -3, 106, 24, 0x050611, .45);
+    const shadow = scene.add.ellipse(0, -3, 106, 24, 0x7a4b20, .2);
     this.character = scene.add.container(0, 0);
     this.#createBody(scene, tint);
-    this.avatar = texture ? scene.add.image(0, -151, texture) : this.#placeholder(scene, tint);
-    this.avatar.setDisplaySize(82, 82).setOrigin(.5);
+    this.avatar = texture ? scene.add.image(0, -160, texture) : this.#placeholder(scene, tint);
+    this.avatar.setDisplaySize(116, 116).setOrigin(.5);
     this.character.add(this.avatar);
+    this.#createCollar(scene, tint);
     this.add([shadow, this.character]);
 
     this.hurtBox = scene.add.rectangle(x, y - 90, FIGHTER.bodyWidth, FIGHTER.bodyHeight, 0x00ff00, 0);
@@ -51,17 +52,31 @@ export class Fighter extends Phaser.GameObjects.Container {
   }
 
   #createBody(scene, tint) {
-    const backArm = scene.add.rectangle(-34, -91, 24, 82, tint, 1).setOrigin(.5, .12).setAngle(8);
-    const backLeg = scene.add.rectangle(-20, -40, 28, 72, 0x27325f).setOrigin(.5, .1).setAngle(3);
-    const frontLeg = scene.add.rectangle(20, -40, 28, 72, 0x34427c).setOrigin(.5, .1).setAngle(-3);
-    const torso = scene.add.rectangle(0, -96, 78, 94, tint).setStrokeStyle(4, 0x171a2e);
-    const belt = scene.add.rectangle(0, -57, 78, 13, 0xffd166).setStrokeStyle(3, 0x171a2e);
-    const frontArm = scene.add.rectangle(34, -91, 24, 82, Phaser.Display.Color.ValueToColor(tint).brighten(12).color, 1)
+    const outline = 0x8c5a2b;
+    const trousersBack = 0x9a7346;
+    const trousersFront = 0xb48b58;
+    const backArm = scene.add.ellipse(-34, -91, 25, 82, tint).setStrokeStyle(2, outline, .7).setOrigin(.5, .12).setAngle(8);
+    const backLeg = scene.add.ellipse(-20, -40, 29, 72, trousersBack).setStrokeStyle(2, outline, .65).setOrigin(.5, .1).setAngle(3);
+    const frontLeg = scene.add.ellipse(20, -40, 29, 72, trousersFront).setStrokeStyle(2, outline, .65).setOrigin(.5, .1).setAngle(-3);
+    const shoulder = scene.add.ellipse(0, -132, 92, 42, tint).setStrokeStyle(2, outline, .6);
+    const torso = scene.add.rectangle(0, -94, 82, 76, tint).setStrokeStyle(2, outline, .7);
+    const torsoHem = scene.add.ellipse(0, -57, 82, 38, tint).setStrokeStyle(2, outline, .55);
+    const belt = scene.add.rectangle(0, -57, 78, 13, 0xffdc82).setStrokeStyle(2, outline, .55);
+    const frontArm = scene.add.ellipse(34, -91, 25, 82, Phaser.Display.Color.ValueToColor(tint).brighten(12).color)
+      .setStrokeStyle(2, outline, .7)
       .setOrigin(.5, .12).setAngle(-8);
-    const leftBoot = scene.add.ellipse(-21, -5, 40, 20, 0x171a2e);
-    const rightBoot = scene.add.ellipse(21, -5, 40, 20, 0x171a2e);
-    this.character.add([backArm, backLeg, frontLeg, torso, belt, frontArm, leftBoot, rightBoot]);
+    const leftBoot = scene.add.ellipse(-21, -5, 40, 20, 0x6f4829).setStrokeStyle(2, outline, .6);
+    const rightBoot = scene.add.ellipse(21, -5, 40, 20, 0x7f5530).setStrokeStyle(2, outline, .6);
+    this.character.add([backArm, backLeg, frontLeg, shoulder, torso, torsoHem, belt, frontArm, leftBoot, rightBoot]);
     this.bodyParts = { backArm, frontArm, backLeg, frontLeg };
+  }
+
+  #createCollar(scene, tint) {
+    const dark = Phaser.Display.Color.ValueToColor(tint).darken(16).color;
+    const collarBase = scene.add.ellipse(0, -119, 70, 27, dark).setStrokeStyle(2, 0x8c5a2b, .55);
+    const collarLight = scene.add.ellipse(0, -123, 54, 18, 0xfff0bd).setStrokeStyle(1, 0xb77b36, .45);
+    const knot = scene.add.circle(0, -113, 7, 0xffcf63).setStrokeStyle(1, 0x9e682f, .55);
+    this.character.add([collarBase, collarLight, knot]);
   }
 
   update(time, input, opponent) {
@@ -108,7 +123,7 @@ export class Fighter extends Phaser.GameObjects.Container {
       if (run.length) texture = run[Math.floor(time / 140) % run.length];
     }
     if (texture && this.scene.textures.exists(texture) && this.avatar.texture.key !== texture) {
-      this.avatar.setTexture(texture).setDisplaySize(82, 82);
+      this.avatar.setTexture(texture).setDisplaySize(116, 116);
     }
   }
 
