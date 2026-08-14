@@ -13,7 +13,7 @@ from PIL import Image
 # 基础配置
 # =========================================================
 
-APP_NAME = "萌萌趣味斗"
+APP_NAME = "萌萌趣味格斗"
 BACKEND_URL = os.getenv("NAILONG_BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
 GAME_URL = os.getenv("NAILONG_GAME_URL", "http://127.0.0.1:5173").rstrip("/")
 
@@ -140,7 +140,7 @@ def generate_nailong(image, background_image):
     <div>人物形象和上传场景均已完成卡通化。</div>
     <div class="success-note">
         已通过后端完成头像分析、透明动漫头像生成和卡通场景生成，
-        可以进入冒险游戏使用当前角色。
+        可以进入格斗游戏使用当前角色。
     </div>
 </div>
 """
@@ -984,8 +984,8 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
     <div class="logo-icon">
         <img src="/gradio_api/file={ASSETS_DIR / 'default_avatar.png'}">
     </div>
-    <div class="logo-title">奶龙冒险</div>
-    <div class="logo-subtitle">Nailong Adventure</div>
+    <div class="logo-title">萌萌趣味格斗</div>
+    <div class="logo-subtitle">Cute Fun Fighter</div>
 </div>
 """)
 
@@ -1000,7 +1000,7 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                 elem_id="avatar-nav",
             )
             game_nav = gr.Button(
-                "🎮　冒险游戏",
+                "🥊　格斗游戏",
                 elem_classes="nav-button",
                 elem_id="game-nav",
             )
@@ -1020,11 +1020,11 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                 gr.HTML("""
 <div class="hero-banner">
     <div class="hero-text">
-        <div class="hero-title">萌萌趣味斗</div>
+        <div class="hero-title">萌萌趣味格斗</div>
         <div class="hero-tag">AI 个性化奶龙创作平台</div>
         <div class="hero-description">
             上传照片，生成你的专属奶龙形象，
-            开启换装、冒险游戏和动画故事创作。
+            开启换装、格斗游戏和动画故事创作。
         </div>
     </div>
 </div>
@@ -1033,7 +1033,7 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                 with gr.Row(elem_classes="home-intro"):
                     for icon, title, text in [
                         ("🎨", "个性形象", "根据人物照片生成奶龙形象"),
-                        ("🎮", "冒险游戏", "使用专属角色进入卡通关卡"),
+                        ("🥊", "格斗游戏", "使用专属角色进入卡通对战"),
                         ("🏆", "排行榜", "查看游戏成绩排行"),
                     ]:
                         gr.HTML(f"""
@@ -1051,7 +1051,7 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                         elem_classes="main-action",
                     )
                     enter_game_button = gr.Button(
-                        "🎮 进入冒险世界",
+                        "🥊 进入格斗世界",
                         elem_classes="secondary-action",
                     )
                     enter_ranking_button = gr.Button(
@@ -1150,14 +1150,14 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                     outputs=download_avatar_button,
                 )
 
-            # 冒险游戏
+            # 格斗游戏
             with gr.Column(
                 visible=False,
                 elem_classes="page-shell",
                 elem_id="game-page",
             ) as game_page:
                 gr.HTML("""
-<div class="page-title">🎮 奶龙冒险游戏</div>
+<div class="page-title">🥊 格斗游戏</div>
 <div class="page-description">
     游戏角色、背景、障碍物和关卡逻辑由后端生成。
 </div>
@@ -1203,7 +1203,7 @@ with gr.Blocks(title=APP_NAME, fill_width=True) as demo:
                 elem_id="ranking-page",
             ) as ranking_page:
                 gr.HTML("""
-<div class="page-title">🏆 奶龙冒险排行榜</div>
+<div class="page-title">🏆 萌萌趣味格斗排行榜</div>
 <div class="page-description">
     排行榜成绩由后端记录并实时更新。
 </div>
